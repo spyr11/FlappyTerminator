@@ -1,14 +1,15 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(SpriteChanger))]
-public class Bullet : MonoBehaviour
+public class Bullet : MonoBehaviour, ISpawnable<Bullet>
 {
     private SpriteChanger _spriteChanger;
     private Rigidbody2D _rigidbody2D;
     private int _layerValue;
     private bool _isHit;
 
-    public Rigidbody2D Rigidbody2D => _rigidbody2D;
+    public event Action<Bullet> Disabled;
 
     private void Awake()
     {
@@ -25,16 +26,19 @@ public class Bullet : MonoBehaviour
         SetAction(collision);
     }
 
-    public void SetLayerValue(int layerValue)
+    public void Init(int layerValue, Vector3 startPosition, Vector3 direction, float shootForce)
     {
         _layerValue = layerValue;
+
+        transform.position = startPosition;
+        _rigidbody2D.velocity = direction * shootForce;
 
         _spriteChanger.Set(layerValue);
     }
 
     private void SetAction(Collider2D collision)
     {
-        if (collision.transform.TryGetComponent(out IDamagable character)
+        if (collision.TryGetComponent(out IDamagable character)
          && (collision.gameObject.layer != _layerValue))
         {
             character.TakeDamage();
@@ -53,8 +57,8 @@ public class Bullet : MonoBehaviour
             return;
         }
 
-        gameObject.SetActive(false);
-
         _isHit = true;
+
+        Disabled?.Invoke(this);
     }
 }

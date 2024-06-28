@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(ColorRandomer))]
-public class Enemy : MonoBehaviour, IDamagable
+public class Enemy : MonoBehaviour, IDamagable, ISpawnable<Enemy>
 {
     private readonly float _offset = 0.5f;
 
@@ -15,6 +15,7 @@ public class Enemy : MonoBehaviour, IDamagable
     private float _shootForce = 2f;
 
     public event Action<int, Vector3, Vector3, float> Shooted;
+    public event Action<Enemy> Disabled;
     public event Action Died;
 
     public Rigidbody2D Rigidbody2D => _rigidBody2D;
@@ -31,6 +32,7 @@ public class Enemy : MonoBehaviour, IDamagable
     private void OnEnable()
     {
         StartCoroutine(StartShooting(_shootDelay));
+
         _colorRandomer.Change();
     }
 
@@ -38,14 +40,22 @@ public class Enemy : MonoBehaviour, IDamagable
     {
         if (collision.TryGetComponent(out Wall wall))
         {
-            gameObject.SetActive(false);
+            Disabled?.Invoke(this);
         }
     }
 
     public void TakeDamage()
     {
         Died?.Invoke();
-        gameObject.SetActive(false);
+
+        Disabled?.Invoke(this);
+    }
+
+    public void Init(int layerValue, Vector3 startPosition, Vector3 direction, float shootForce)
+    {
+        transform.position = startPosition;
+
+        _rigidBody2D.velocity = direction * shootForce;
     }
 
     private IEnumerator StartShooting(float shootDelay)

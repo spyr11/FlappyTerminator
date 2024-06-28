@@ -1,52 +1,64 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Pool<T> where T : MonoBehaviour
 {
+    private readonly Action<T> _actionOnRelease;
+    private readonly Action<T> _actionOnGet;
+
+    private readonly List<T> _activeElements;
+    private readonly Stack<T> _elements;
+
     private readonly Transform _container;
-    private readonly bool _canExpand;
     private readonly T _prefab;
 
-    private List<T> _objects;
-
-    public IReadOnlyList<T> AllObjects => _objects;
-
-    public Pool(T prefab, int size = 10, Transform container = null, bool canExpand = true)
+    public Pool(T prefab, int initialSize = 0, Transform container = null, Action<T> actionOnGet = null, Action<T> actionOnRelease = null)
     {
-        _objects = new List<T>();
+        _elements = new Stack<T>();
+        _activeElements = new List<T>();
 
         _prefab = prefab;
         _container = container;
-        _canExpand = canExpand;
+        _actionOnGet = actionOnGet;
+        _actionOnRelease = actionOnRelease;
 
-        CreatePool(size);
+        CreatePool(initialSize);
     }
 
     public T Get()
     {
-        if (TryGetObject(out T element))
+        T element;
+
+        if (_elements.TryPop(out element) == false)
         {
-            return element;
+            element = CreateObject();
         }
 
-        if (_canExpand)
-        {
-            return CreateObject(true);
-        }
+        _activeElements.Add(element);
 
-        return null;
+        _actionOnGet?.Invoke(element);
+
+        element.gameObject.SetActive(true);
+
+        return element;
+    }
+
+    public void Release(T element)
+    {
+        _actionOnRelease?.Invoke(element);
+
+        _elements.Push(element);
+        _activeElements.Remove(element);
+
+        element.gameObject.SetActive(false);
     }
 
     public void Reset()
     {
-        foreach (T element in _objects)
+        for (int i = _activeElements.Count - 1; i >= 0; i--)
         {
-            if (_container != null)
-            {
-                element.transform.position = _container.position;
-            }
-
-            element.gameObject.SetActive(false);
+            Release(_activeElements[i]);
         }
     }
 
@@ -54,35 +66,16 @@ public class Pool<T> where T : MonoBehaviour
     {
         for (int i = 0; i < size; i++)
         {
-            CreateObject();
+            _elements.Push(CreateObject());
         }
     }
 
-    private T CreateObject(bool isActive = false)
+    private T CreateObject()
     {
-        T newObject = Object.Instantiate(_prefab);
-        newObject.gameObject.SetActive(isActive);
+        T newObject = UnityEngine.Object.Instantiate(_prefab);
+        newObject.gameObject.SetActive(false);
         newObject.transform.SetParent(_container);
 
-        _objects.Add(newObject);
-
         return newObject;
-    }
-
-    private bool TryGetObject(out T obj)
-    {
-        foreach (T element in _objects)
-        {
-            if (element.gameObject.activeInHierarchy == false)
-            {
-                obj = element;
-                obj.gameObject.SetActive(true);
-
-                return true;
-            }
-        }
-
-        obj = null;
-        return false;
     }
 }

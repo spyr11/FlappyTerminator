@@ -19,7 +19,7 @@ public class Player : MonoBehaviour, IDamagable
 
     private void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(1))
         {
             Shoot();
         }
@@ -35,6 +35,6 @@ public class Player : MonoBehaviour, IDamagable
 
         newPosition.x += _offset;
 
-        _bulletSpawner.Shoot(gameObject.layer, newPosition, transform.right, _shootForce);
+        _bulletSpawner.Spawn(gameObject.layer, newPosition, transform.right, _shootForce);
     }
 }

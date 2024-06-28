@@ -1,60 +1,41 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class EnemySpawner : MonoBehaviour
+public class EnemySpawner : Spawner<Enemy>
 {
-    private readonly bool _canExpandPool = false;
     private readonly float _offset = 0.5f;
 
     [SerializeField] private BulletSpawner _bulletSpawner;
     [SerializeField] private ScoreCounter _scoreCounter;
     [SerializeField] private BoxCollider2D _boxCollider;
-    [SerializeField] private Enemy _enemyPrefab;
-    [SerializeField] private int _enemyCount;
+    [SerializeField] private float _speed;
     [SerializeField] private float _delay;
-
-    private Pool<Enemy> _pool;
 
     private float _minBoundY;
     private float _maxBoundY;
 
-    private void Awake()
+    protected override void Init()
     {
         _minBoundY = _boxCollider.bounds.min.y + _offset;
         _maxBoundY = _boxCollider.bounds.max.y - _offset;
-
-        float rotationY = 180f;
-
-        _enemyPrefab.transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
-
-        _pool = new Pool<Enemy>(_enemyPrefab, _enemyCount, transform, _canExpandPool);
     }
 
-    private void OnEnable() => Subscribe(_pool.AllObjects);
+    protected override void StartAction() => StartCoroutine(StartSpawning(_delay));
 
-    private void OnDisable() => Unscribe(_pool.AllObjects);
-
-    private void Start() => StartCoroutine(StartSpawning(_delay));
-
-    public void Reset() => _pool.Reset();
-
-    private void Subscribe(IReadOnlyList<Enemy> enemies)
+    protected override void SetActionOnGet(Enemy enemy)
     {
-        foreach (Enemy enemy in enemies)
-        {
-            enemy.Shooted += _bulletSpawner.Shoot;
-            enemy.Died += _scoreCounter.Add;
-        }
+        base.SetActionOnGet(enemy);
+
+        enemy.Died += _scoreCounter.Add;
+        enemy.Shooted += _bulletSpawner.Spawn;
     }
 
-    private void Unscribe(IReadOnlyList<Enemy> enemies)
+    protected override void SetActionOnRelease(Enemy enemy)
     {
-        foreach (Enemy enemy in enemies)
-        {
-            enemy.Shooted -= _bulletSpawner.Shoot;
-            enemy.Died -= _scoreCounter.Add;
-        }
+        base.SetActionOnRelease(enemy);
+
+        enemy.Died -= _scoreCounter.Add;
+        enemy.Shooted -= _bulletSpawner.Spawn;
     }
 
     private IEnumerator StartSpawning(float delay)
@@ -69,23 +50,9 @@ public class EnemySpawner : MonoBehaviour
 
             Vector3 newPosition = new Vector3(transform.position.x, positionY, transform.position.z);
 
-            Spawn(newPosition, _enemyPrefab.transform.right, _enemyPrefab.Speed);
+            Spawn(0, newPosition, transform.right, _speed);
 
             yield return waitForSeconds;
         }
-    }
-
-    private void Spawn(Vector3 startPosition, Vector3 direction, float shootForce)
-    {
-        var enemy = _pool.Get();
-
-        if (enemy == null)
-        {
-            return;
-        }
-
-        enemy.transform.position = startPosition;
-
-        enemy.Rigidbody2D.velocity = direction * shootForce;
     }
 }
